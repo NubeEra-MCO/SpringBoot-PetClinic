@@ -27,6 +27,7 @@ git clone https://github.com/NubeEra-MCO/SpringBoot-PetClinic.git .
 ```bash
 sudo apt update
 sudo apt install -y docker.io openjdk-17-jdk-headless maven
+sudo chmod 777 /var/run/docker*
 ```
 
 * Verify installations:
@@ -35,6 +36,7 @@ sudo apt install -y docker.io openjdk-17-jdk-headless maven
 java -version
 javac -version
 mvn --version
+docker info
 ```
 
 ---
@@ -190,3 +192,4 @@ docker images | grep springboot2
 * Docker image tagged as `mujahed/springboot2:v1-mysql` and pushed to Docker Hub
 
 ---
+
