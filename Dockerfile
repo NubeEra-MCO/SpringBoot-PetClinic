@@ -8,5 +8,5 @@ COPY target/*.jar app.jar
 # Expose Spring Boot port
 EXPOSE 8000
 
-# Run with mysql profile
-ENTRYPOINT ["java", "-Dspring.profiles.active=mysql", "-jar", "app.jar", "--server.port=8000"]
+# Run with postgres profile
+ENTRYPOINT ["java", "-Dspring.profiles.active=postgres", "-jar", "app.jar", "--server.port=8000"]

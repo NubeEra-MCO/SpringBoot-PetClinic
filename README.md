@@ -1,28 +1,28 @@
-# Deploy Containerized Web Application with MySQL and Take Backup
+# **Deploy Containerized Web Application with PostgreSQL and Take Backup**
 
 ---
 
 ## **Step 1: Prepare directories**
 
-* Create directories for persistent MySQL storage and web app source:
+Create directories for persistent database storage and web app source:
 
 ```bash
-mkdir -p ~/mujahed/mysqldata    # Persistent MySQL storage
+mkdir -p ~/mujahed/pgdata       # Persistent PostgreSQL storage
 mkdir -p ~/mujahed/webapp       # Petclinic application source
 ```
 
-* Clone the updated repository:
+Clone the updated repository:
 
 ```bash
 cd ~/mujahed/webapp
-git clone https://github.com/NubeEra-MCO/SpringBoot-PetClinic.git .
+git clone --branch postgresql  https://github.com/NubeEra-MCO/SpringBoot-PetClinic.git .
 ```
 
 ---
 
 ## **Step 2: Install prerequisites**
 
-* Install Docker, Java 17, and Maven:
+Install Docker, Java 17, and Maven:
 
 ```bash
 sudo apt update
@@ -30,7 +30,7 @@ sudo apt install -y docker.io openjdk-17-jdk-headless maven
 sudo chmod 777 /var/run/docker*
 ```
 
-* Verify installations:
+Verify installations:
 
 ```bash
 java -version
@@ -43,7 +43,7 @@ docker info
 
 ## **Step 3: Create Docker network**
 
-* Create a network for MySQL and web app communication:
+Create a network for PostgreSQL and web app communication:
 
 ```bash
 docker network create mujahed-network
@@ -51,24 +51,23 @@ docker network create mujahed-network
 
 ---
 
-## **Step 4: Run MySQL container**
+## **Step 4: Run PostgreSQL container**
 
-* Start MySQL container with persistent storage:
+Start PostgreSQL container with persistent storage:
 
 ```bash
 docker run -d \
-  --name mujahed-mysql \
+  --name mujahed-postgres \
   --network mujahed-network \
-  -e MYSQL_USER=mujahed \
-  -e MYSQL_PASSWORD=123 \
-  -e MYSQL_ROOT_PASSWORD=root \
-  -e MYSQL_DATABASE=pcdb \
-  -v ~/mujahed/mysqldata:/var/lib/mysql \
-  -p 3300:3306 \
-  mysql:9.5
+  -e POSTGRES_USER=mujahed \
+  -e POSTGRES_PASSWORD=123 \
+  -e POSTGRES_DB=pcdb \
+  -v ~/mujahed/pgdata:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  postgres:16
 ```
 
-* Verify container status:
+Verify container status:
 
 ```bash
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
@@ -76,54 +75,40 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 ---
 
-## **Step 5: Access MySQL container and create users (optional)**
+## **Step 5: Access PostgreSQL container (optional)**
 
-* Enter MySQL container:
-
-```bash
-docker exec -it mujahed-mysql bash
-```
-
-* Login as root:
+Enter the container:
 
 ```bash
-mysql -u root -proot
+docker exec -it mujahed-postgres bash
 ```
 
-* Grant privileges (if needed):
+Login as user:
 
-```sql
-ALTER USER 'root'@'%' IDENTIFIED BY 'root';
-ALTER USER 'mujahed'@'%' IDENTIFIED BY '123';
-GRANT ALL PRIVILEGES ON pcdb.* TO 'mujahed'@'%';
-FLUSH PRIVILEGES;
-EXIT;
+```bash
+psql -U mujahed -d pcdb
 ```
+
+*You can create additional users or modify privileges here if needed.*
 
 ---
 
 ## **Step 6: Backup `pcdb` database**
 
-**Option 1: Using container bash**
+**Option 1: Inside container**
 
 ```bash
-docker exec -it mujahed-mysql bash
-mysqldump -u root -proot --single-transaction --routines --triggers pcdb > /tmp/pcdb.sql
+docker exec -it mujahed-postgres bash
+pg_dump -U mujahed pcdb > /tmp/pcdb.sql
 exit
-docker cp mujahed-mysql:/tmp/pcdb.sql ~/mujahed/pcdb.sql
+docker cp mujahed-postgres:/tmp/pcdb.sql ~/mujahed/pcdb.sql
 ```
 
-**Option 2: Directly from host with timestamped backup**
+**Option 2: Directly from host with timestamp**
 
 ```bash
-docker exec mujahed-mysql \
-  mysqldump -u root -proot \
-  --single-transaction \
-  --routines \
-  --triggers \
-  --events \
-  --set-gtid-purged=OFF \
-  --databases pcdb \
+docker exec mujahed-postgres \
+  pg_dump -U mujahed pcdb \
   > ~/mujahed/pcdb_$(date +%F).sql
 ```
 
@@ -131,65 +116,129 @@ docker exec mujahed-mysql \
 
 ## **Step 7: Insert sample data into `types` table**
 
-* Login to MySQL:
+Login to PostgreSQL:
 
 ```bash
-docker exec -it mujahed-mysql bash
-mysql -u mujahed -p123 pcdb
+docker exec -it mujahed-postgres psql -U mujahed -d pcdb
 ```
 
-* Insert sample records:
+Insert sample records:
 
 ```sql
 INSERT INTO types (name) VALUES ('Dog');
 INSERT INTO types (name) VALUES ('Cat');
 INSERT INTO types (name) VALUES ('Bird');
-EXIT;
+\q
 ```
 
 ---
 
-## **Step 8: Notes on `application-mysql.properties`**
+## **Step 8: Notes on `application-postgres.properties`**
 
-* File location:
+File location:
 
 ```
-~/mujahed/webapp/src/main/resources/application-mysql.properties
+~/mujahed/webapp/src/main/resources/application-postgres.properties
 ```
 
-* It should define MySQL connection details and Spring Boot server port.
+It should define PostgreSQL connection details and Spring Boot server port (e.g., 8000).
+
+Example:
+
+```properties
+spring.datasource.url=jdbc:postgresql://mujahed-postgres:5432/pcdb
+spring.datasource.username=mujahed
+spring.datasource.password=123
+server.port=8000
+```
 
 ---
 
-## **Step 9: Tag and Push Docker Image**
+## **Step 9: Build, Tag, and Push Docker Image (PostgreSQL version)**
 
-* Tag your local image with a descriptive name:
+1. **Build Spring Boot app with Maven**:
 
 ```bash
-docker tag mujahed-pcwebapp:v1 mujahed/springboot2:v1-mysql
+cd ~/mujahed/webapp
+mvn clean package -DskipTests
 ```
 
-* Push the image to Docker Hub:
+2. **Dockerfile** (already provided):
 
-```bash
-docker push mujahed/springboot2:v1-mysql
+```dockerfile
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
+
+# Copy pre-built jar
+COPY target/*.jar app.jar
+
+# Expose Spring Boot port
+EXPOSE 8000
+
+# Run with postgres profile
+ENTRYPOINT ["java", "-Dspring.profiles.active=postgres", "-jar", "app.jar", "--server.port=8000"]
 ```
 
-* Verify the image locally:
+3. **Build Docker image**:
 
 ```bash
-docker images | grep springboot2
+docker build -t mujahed-pcwebapp-postgres:v1 .
+```
+
+4. **Tag image for Docker Hub**:
+
+```bash
+docker tag mujahed-pcwebapp-postgres:v1 mujahed/springboot-postgres:v1
+```
+
+5. **Push image to Docker Hub**:
+
+```bash
+docker push mujahed/springboot-postgres:v1
+```
+
+6. **Verify image locally**:
+
+```bash
+docker images | grep postgres
+```
+
+---
+
+## **Step 10: Run the Web Application container**
+
+Run Spring Boot web app container connected to PostgreSQL network:
+
+```bash
+docker run -d \
+  --name mujahed-pcwebapp \
+  --network mujahed-network \
+  -p 8000:8000 \
+  mujahed/springboot-postgres:v1
+```
+
+Verify container is running:
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+Now your web app should be accessible at:
+
+```
+http://localhost:8000
 ```
 
 ---
 
 ## **Outcome**
 
-* MySQL container is running with database `pcdb`
-* Persistent data stored at `~/mujahed/mysqldata`
+* PostgreSQL container running with database `pcdb`
+* Persistent data stored at `~/mujahed/pgdata`
 * Database backup exists as `~/mujahed/pcdb.sql` or `~/mujahed/pcdb_YYYY-MM-DD.sql`
 * Sample `types` data inserted
-* Docker image tagged as `mujahed/springboot2:v1-mysql` and pushed to Docker Hub
+* Docker image built for PostgreSQL profile, tagged, and pushed to Docker Hub
+* Web application container running and accessible on port 8000
 
 ---
-
