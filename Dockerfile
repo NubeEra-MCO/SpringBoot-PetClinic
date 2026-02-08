@@ -9,4 +9,4 @@ COPY target/*.jar app.jar
 EXPOSE 8000
 
 # Run with mysql profile
-ENTRYPOINT ["java", "-Dspring.profiles.active=mysql", "-jar", "target/app.jar", "--server.port=8000"]
+ENTRYPOINT ["java", "-Dspring.profiles.active=mysql", "-jar", "app.jar", "--server.port=8000"]
