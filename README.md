@@ -1,14 +1,17 @@
 # Deploy Containerized Web Application with MySQL and Take Backup
+
 ---
 
 ## **Step 1: Prepare directories**
+
+* Create directories for persistent MySQL storage and web app source:
 
 ```bash
 mkdir -p ~/mujahed/mysqldata    # Persistent MySQL storage
 mkdir -p ~/mujahed/webapp       # Petclinic application source
 ```
 
-Clone the updated repository:
+* Clone the updated repository:
 
 ```bash
 cd ~/mujahed/webapp
@@ -19,12 +22,14 @@ git clone https://github.com/NubeEra-MCO/SpringBoot-PetClinic.git .
 
 ## **Step 2: Install prerequisites**
 
+* Install Docker, Java 17, and Maven:
+
 ```bash
 sudo apt update
 sudo apt install -y docker.io openjdk-17-jdk-headless maven
 ```
 
-Verify installation:
+* Verify installations:
 
 ```bash
 java -version
@@ -36,6 +41,8 @@ mvn --version
 
 ## **Step 3: Create Docker network**
 
+* Create a network for MySQL and web app communication:
+
 ```bash
 docker network create mujahed-network
 ```
@@ -43,6 +50,8 @@ docker network create mujahed-network
 ---
 
 ## **Step 4: Run MySQL container**
+
+* Start MySQL container with persistent storage:
 
 ```bash
 docker run -d \
@@ -57,7 +66,7 @@ docker run -d \
   mysql:9.5
 ```
 
-Check MySQL container:
+* Verify container status:
 
 ```bash
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
@@ -67,17 +76,19 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 ## **Step 5: Access MySQL container and create users (optional)**
 
+* Enter MySQL container:
+
 ```bash
 docker exec -it mujahed-mysql bash
 ```
 
-Login as root:
+* Login as root:
 
 ```bash
 mysql -u root -proot
 ```
 
-Optional: grant privileges (if needed):
+* Grant privileges (if needed):
 
 ```sql
 ALTER USER 'root'@'%' IDENTIFIED BY 'root';
@@ -118,14 +129,14 @@ docker exec mujahed-mysql \
 
 ## **Step 7: Insert sample data into `types` table**
 
-Login to MySQL:
+* Login to MySQL:
 
 ```bash
 docker exec -it mujahed-mysql bash
 mysql -u mujahed -p123 pcdb
 ```
 
-Run SQL commands:
+* Insert sample records:
 
 ```sql
 INSERT INTO types (name) VALUES ('Dog');
@@ -136,21 +147,46 @@ EXIT;
 
 ---
 
-## **Step 8: Notes on application-mysql.properties**
+## **Step 8: Notes on `application-mysql.properties`**
 
-You **don’t need to put contents here**, but the file is located at:
+* File location:
 
 ```
 ~/mujahed/webapp/src/main/resources/application-mysql.properties
 ```
 
-It should define MySQL connection details and port for Spring Boot.
+* It should define MySQL connection details and Spring Boot server port.
 
 ---
 
-✅ **Outcome:**
+## **Step 9: Tag and Push Docker Image**
+
+* Tag your local image with a descriptive name:
+
+```bash
+docker tag mujahed-pcwebapp:v1 mujahed/springboot2:v1-mysql
+```
+
+* Push the image to Docker Hub:
+
+```bash
+docker push mujahed/springboot2:v1-mysql
+```
+
+* Verify the image locally:
+
+```bash
+docker images | grep springboot2
+```
+
+---
+
+## **Outcome**
 
 * MySQL container is running with database `pcdb`
 * Persistent data stored at `~/mujahed/mysqldata`
 * Database backup exists as `~/mujahed/pcdb.sql` or `~/mujahed/pcdb_YYYY-MM-DD.sql`
 * Sample `types` data inserted
+* Docker image tagged as `mujahed/springboot2:v1-mysql` and pushed to Docker Hub
+
+---
